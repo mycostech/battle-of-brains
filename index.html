@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battle of Brains - Apps</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;900&family=Orbitron:wght@400;900&display=swap');
+        body {
+            font-family: 'Kanit', sans-serif;
+            background: radial-gradient(circle at center, #111 0%, #050505 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .font-game { font-family: 'Orbitron', sans-serif; }
+    </style>
+</head>
+<body class="flex items-center justify-center p-8">
+    <div class="max-w-2xl w-full text-center">
+        <h1 class="text-5xl font-game font-black text-white mb-4">BATTLE OF BRAINS</h1>
+        <p class="text-slate-500 mb-12">Choose an app to get started</p>
+
+        <div class="grid gap-4">
+            <a href="src/battle_of_brains.html" class="block p-6 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/50 rounded-2xl transition-all group">
+                <div class="flex items-center justify-between">
+                    <div class="text-left">
+                        <h2 class="text-xl font-black uppercase text-blue-500 group-hover:text-blue-400 transition">Scoreboard</h2>
+                        <p class="text-sm text-slate-500 mt-1">Live quiz competition scoreboard with team management and round tracking</p>
+                    </div>
+                    <span class="text-2xl text-slate-600 group-hover:text-blue-500 transition">→</span>
+                </div>
+            </a>
+        </div>
+    </div>
+</body>
+</html>
