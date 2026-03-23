@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battle of Brains - Pro Ultimate</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;900&family=Orbitron:wght@400;900&display=swap');
+
+        body {
+            font-family: 'Kanit', sans-serif;
+            background: radial-gradient(circle at center, #111 0%, #050505 100%);
+            color: white;
+            overflow-x: hidden;
+        }
+
+        .font-game { font-family: 'Orbitron', sans-serif; }
+
+        .flip-list-move { transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55); }
+
+        .winner-card {
+            background: white !important;
+            color: black !important;
+            box-shadow: 0 0 50px rgba(59, 130, 246, 0.5);
+            transform: scale(1.03);
+            border: 2px solid #3b82f6;
+        }
+
+        .neon-border {
+            position: relative;
+            overflow: hidden;
+        }
+        .neon-border::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 2px;
+            background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+            animation: beam 3s linear infinite;
+        }
+        @keyframes beam { 100% { left: 100%; } }
+
+        /* Edit name input style */
+        .edit-name-input {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.5);
+            border-radius: 8px;
+            color: white;
+            font-family: 'Kanit', sans-serif;
+            font-weight: 900;
+            font-size: 1rem;
+            padding: 4px 10px;
+            outline: none;
+            width: 100%;
+            transition: border-color 0.2s;
+        }
+        .edit-name-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+        }
+
+        /* Pencil button pulse */
+        .edit-btn {
+            opacity: 0.3;
+            transition: opacity 0.2s, transform 0.2s;
+        }
+        .edit-btn:hover {
+            opacity: 1;
+            transform: scale(1.2) rotate(-10deg);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div id="app" class="p-4 md:p-8">
+
+        <!-- Setup Screen -->
+        <div v-if="!gameStarted" class="max-w-xl mx-auto mt-10">
+            <div class="bg-[#111]/90 backdrop-blur-md p-8 rounded-3xl border border-white/10 shadow-2xl">
+                <h1 class="text-4xl font-game font-black text-center text-blue-500 mb-2">BATTLE OF BRAINS</h1>
+                <p class="text-center text-slate-500 text-sm mb-8">Add teams to get started</p>
+
+                <!-- Add team input -->
+                <div class="flex gap-2 mb-6">
+                    <input v-model="newTeamName" @keyup.enter="addTeam" class="flex-1 bg-black border border-white/10 text-white font-bold px-4 py-3 rounded-xl outline-none focus:border-blue-500 transition uppercase placeholder:normal-case placeholder:font-normal" placeholder="Enter team name..." maxlength="20">
+                    <button @click="addTeam" class="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-xl font-black text-sm transition-all active:scale-95 shadow-lg shadow-blue-900/40">+ ADD</button>
+                </div>
+
+                <!-- Team list -->
+                <div class="space-y-2 mb-8">
+                    <div v-if="players.length === 0" class="text-center text-slate-600 py-8 text-sm">No teams yet. Add at least 2 teams to start.</div>
+                    <div v-for="(player, idx) in players" :key="player.id" class="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
+                        <span class="font-black uppercase tracking-tight">{{ player.name }}</span>
+                        <button @click="removeTeam(idx)" class="text-rose-500 hover:text-rose-400 transition text-xs font-bold px-2 py-1 rounded hover:bg-rose-500/10">REMOVE</button>
+                    </div>
+                </div>
+
+                <!-- Start button -->
+                <button @click="startGame" :disabled="players.length < 2" class="w-full py-4 rounded-2xl font-game font-black text-lg uppercase transition-all active:scale-95 shadow-lg" :class="players.length >= 2 ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/40' : 'bg-white/5 text-slate-600 cursor-not-allowed'">
+                    START BATTLE ({{ players.length }} teams)
+                </button>
+
+                <!-- Saved games -->
+                <div v-if="hasSavedGame" class="mt-4">
+                    <button @click="loadGame" class="w-full py-3 rounded-2xl font-bold text-sm bg-white/5 hover:bg-white/10 border border-white/5 transition-all">
+                        RESUME SAVED GAME
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div v-else class="grid grid-cols-1 xl:grid-cols-12 gap-8">
+
+            <!-- Left Panel: Admin -->
+            <div class="xl:col-span-4 space-y-4">
+                <div class="bg-[#111]/90 backdrop-blur-md p-6 rounded-3xl border border-white/10 shadow-2xl">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-game font-black text-blue-500 uppercase">Master Admin</h2>
+                        <div class="flex gap-2">
+                            <button @click="resetGame" class="text-[10px] bg-white/10 px-3 py-1 rounded-lg hover:bg-white/20 transition">New Game</button>
+                            <button @click="exportData" class="text-[10px] bg-white/10 px-3 py-1 rounded-lg hover:bg-white/20 transition">Export CSV</button>
+                            <button @click="nextRound" class="bg-blue-600 hover:bg-blue-500 px-5 py-2 rounded-xl font-black text-xs transition-all active:scale-95 shadow-lg shadow-blue-900/40">NEXT ➔</button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-6 p-4 bg-white/5 rounded-2xl border border-white/10 shadow-inner">
+                        <div class="text-center">
+                            <label class="block text-[10px] uppercase font-bold text-emerald-500 mb-1">Correct (+)</label>
+                            <input type="number" v-model.number="config.plus" class="w-full bg-black border border-emerald-900/30 text-emerald-400 font-game p-2 rounded-lg text-center text-xl focus:ring-1 focus:ring-emerald-500 outline-none">
+                        </div>
+                        <div class="text-center">
+                            <label class="block text-[10px] uppercase font-bold text-rose-500 mb-1">Wrong (-)</label>
+                            <input type="number" v-model.number="config.minus" class="w-full bg-black border border-rose-900/30 text-rose-400 font-game p-2 rounded-lg text-center text-xl focus:ring-1 focus:ring-rose-500 outline-none">
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div v-for="(player, pIndex) in players" :key="player.id" class="p-4 rounded-2xl border bg-[#1a1a1a] border-white/5 transition-all hover:bg-[#222]">
+                            <div class="flex justify-between items-center mb-4">
+
+                                <!-- Name display / edit toggle -->
+                                <div class="flex-1 mr-3">
+                                    <!-- View mode -->
+                                    <div v-if="editingIndex !== pIndex" class="flex items-center gap-2">
+                                        <span class="font-black text-lg uppercase tracking-tight truncate">{{ player.name }}</span>
+                                        <button @click="startEdit(pIndex)" class="edit-btn text-blue-400 flex-shrink-0" title="แก้ไขชื่อ">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <!-- Edit mode -->
+                                    <div v-else class="flex items-center gap-2">
+                                        <input
+                                            :ref="el => { if (el) editInputRefs[pIndex] = el }"
+                                            v-model="editingName"
+                                            @keyup.enter="confirmEdit(pIndex)"
+                                            @keyup.esc="cancelEdit"
+                                            @blur="confirmEdit(pIndex)"
+                                            class="edit-name-input text-sm uppercase font-black"
+                                            placeholder="ชื่อทีม..."
+                                            maxlength="20"
+                                        />
+                                        <button @click="confirmEdit(pIndex)" class="flex-shrink-0 text-emerald-400 hover:text-emerald-300 transition" title="บันทึก">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                <polyline points="20 6 9 17 4 12"/>
+                                            </svg>
+                                        </button>
+                                        <button @click="cancelEdit" class="flex-shrink-0 text-rose-400 hover:text-rose-300 transition" title="ยกเลิก">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="font-game text-xl font-black text-blue-500 tabular-nums flex-shrink-0">{{ player.totalScore }}</div>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button @click="giveScore(pIndex, config.plus)" class="bg-emerald-600 hover:bg-emerald-500 py-3 rounded-xl font-black text-xs uppercase shadow-md active:scale-95">Win</button>
+                                <button @click="giveScore(pIndex, -Math.abs(config.minus))" class="bg-rose-700 hover:bg-rose-600 py-3 rounded-xl font-black text-xs uppercase shadow-md active:scale-95">Loss</button>
+                                <button @click="undoLast(pIndex)" class="bg-white/5 hover:bg-white/10 text-slate-500 py-3 rounded-xl font-black text-[10px] uppercase border border-white/5 transition-all">Undo</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-[#111]/80 p-5 rounded-3xl border border-white/5">
+                    <h3 class="text-slate-500 font-black mb-3 uppercase text-[9px] tracking-widest text-center">BATTLE LOGS</h3>
+                    <div class="max-h-32 overflow-y-auto space-y-1 pr-2 text-[10px]">
+                        <div v-for="(log, lIdx) in logs.slice().reverse()" :key="lIdx" class="flex justify-between bg-white/5 p-2 rounded border border-white/5">
+                            <span><b>R{{log.round}}</b> {{log.name}}</span>
+                            <span :class="log.points > 0 ? 'text-emerald-400' : 'text-rose-400'" class="font-bold">{{log.points > 0 ? '+'+log.points : log.points}}</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Panel: Scoreboard -->
+            <div class="xl:col-span-8 bg-black/40 p-10 rounded-[4rem] border-2 border-white/5 shadow-2xl min-h-[85vh] relative flex flex-col justify-center overflow-hidden neon-border">
+
+                <div class="text-center mb-16 relative">
+                    <h1 class="text-8xl font-game font-black italic tracking-tighter text-white drop-shadow-[0_10px_20px_rgba(0,0,0,1)]">
+                        BATTLE OF BRAINS
+                    </h1>
+                    <div class="inline-block px-10 py-2 bg-blue-600 text-white font-game text-xs tracking-[0.5em] font-black uppercase mt-6 skew-x-[-20deg]">
+                        ROUND {{ currentRound }} STANDINGS
+                    </div>
+                </div>
+
+                <transition-group name="flip-list" tag="div" class="space-y-6 max-w-4xl mx-auto w-full relative z-10">
+                    <div v-for="(player, index) in sortedPlayers" :key="player.id"
+                         class="flex items-center p-8 rounded-[2.5rem] transition-all duration-1000 border transform shadow-2xl"
+                         :class="index === 0 ? 'winner-card' : 'bg-[#111]/90 text-white border-white/10'">
+
+                        <div class="text-5xl font-game font-black italic w-24" :class="index === 0 ? 'text-blue-600' : 'text-slate-800'">
+                            #{{ index + 1 }}
+                        </div>
+
+                        <div class="flex-1">
+                            <div class="text-4xl font-black uppercase tracking-tighter truncate">{{ player.name }}</div>
+                            <div class="flex gap-2 mt-3">
+                                <div v-for="(h, hi) in player.history.slice(-10)" :key="hi" class="w-3 h-3 rounded-full"
+                                     :class="h > 0 ? 'bg-emerald-500' : (h < 0 ? 'bg-rose-500' : 'bg-slate-700')">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-7xl font-game font-black tabular-nums tracking-tighter">{{ player.totalScore }}</div>
+                    </div>
+                </transition-group>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'battle-of-brains-game';
+        const { createApp, nextTick } = Vue;
+        createApp({
+            data() {
+                return {
+                    gameStarted: false,
+                    hasSavedGame: !!localStorage.getItem(STORAGE_KEY),
+                    newTeamName: '',
+                    nextId: 1,
+                    currentRound: 1,
+                    config: { plus: 50, minus: 50 },
+                    logs: [],
+                    editingIndex: null,
+                    editingName: '',
+                    editInputRefs: {},
+                    players: []
+                }
+            },
+            computed: {
+                sortedPlayers() {
+                    return [...this.players].sort((a, b) => b.totalScore - a.totalScore);
+                }
+            },
+            watch: {
+                players: { handler() { if (this.gameStarted) this.saveGame(); }, deep: true },
+                currentRound() { if (this.gameStarted) this.saveGame(); },
+                logs: { handler() { if (this.gameStarted) this.saveGame(); }, deep: true },
+                config: { handler() { if (this.gameStarted) this.saveGame(); }, deep: true }
+            },
+            methods: {
+                /* --- Team Setup --- */
+                addTeam() {
+                    const name = this.newTeamName.trim().toUpperCase();
+                    if (!name) return;
+                    this.players.push({ id: this.nextId++, name, totalScore: 0, history: [], lastActions: [] });
+                    this.newTeamName = '';
+                },
+                removeTeam(idx) {
+                    this.players.splice(idx, 1);
+                },
+                startGame() {
+                    if (this.players.length < 2) return;
+                    this.gameStarted = true;
+                    this.saveGame();
+                },
+                resetGame() {
+                    if (!confirm('Start a new game? Current progress will be lost.')) return;
+                    localStorage.removeItem(STORAGE_KEY);
+                    this.gameStarted = false;
+                    this.hasSavedGame = false;
+                    this.players = [];
+                    this.logs = [];
+                    this.currentRound = 1;
+                    this.nextId = 1;
+                    this.config = { plus: 50, minus: 50 };
+                },
+
+                /* --- localStorage --- */
+                saveGame() {
+                    const data = {
+                        players: this.players,
+                        currentRound: this.currentRound,
+                        logs: this.logs,
+                        config: this.config,
+                        nextId: this.nextId
+                    };
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                },
+                loadGame() {
+                    const raw = localStorage.getItem(STORAGE_KEY);
+                    if (!raw) return;
+                    try {
+                        const data = JSON.parse(raw);
+                        if (!data.players || !Array.isArray(data.players)) throw new Error('Invalid save');
+                        this.players = data.players;
+                        this.currentRound = data.currentRound || 1;
+                        this.logs = data.logs || [];
+                        this.config = (data.config && data.config.plus !== undefined) ? data.config : { plus: 50, minus: 50 };
+                        this.nextId = data.nextId || this.players.length + 1;
+                        this.gameStarted = true;
+                    } catch (e) {
+                        console.error('Failed to load saved game, clearing...', e);
+                        localStorage.removeItem(STORAGE_KEY);
+                        this.hasSavedGame = false;
+                    }
+                },
+
+                /* --- Edit Name --- */
+                startEdit(pIndex) {
+                    this.editingIndex = pIndex;
+                    this.editingName = this.players[pIndex].name;
+                    nextTick(() => {
+                        const input = this.editInputRefs[pIndex];
+                        if (input) { input.focus(); input.select(); }
+                    });
+                },
+                confirmEdit(pIndex) {
+                    const trimmed = this.editingName.trim().toUpperCase();
+                    if (trimmed) {
+                        this.players[pIndex].name = trimmed;
+                    }
+                    this.editingIndex = null;
+                    this.editingName = '';
+                },
+                cancelEdit() {
+                    this.editingIndex = null;
+                    this.editingName = '';
+                },
+
+                /* --- Score --- */
+                giveScore(pIdx, pts) {
+                    const score = parseInt(pts) || 0;
+                    this.players[pIdx].history[this.currentRound - 1] = (this.players[pIdx].history[this.currentRound - 1] || 0) + score;
+                    this.players[pIdx].lastActions.push({ round: this.currentRound, points: score });
+                    this.logs.push({ round: this.currentRound, name: this.players[pIdx].name, points: score });
+                    this.updateTotal(pIdx);
+                },
+                undoLast(pIdx) {
+                    const player = this.players[pIdx];
+                    if (player.lastActions.length > 0) {
+                        const lastAction = player.lastActions.pop();
+                        player.history[lastAction.round - 1] -= lastAction.points;
+                        this.logs.push({ round: lastAction.round, name: player.name + ' (Undo)', points: -lastAction.points });
+                        this.updateTotal(pIdx);
+                    }
+                },
+                updateTotal(pIdx) {
+                    this.players[pIdx].totalScore = this.players[pIdx].history.reduce((a, b) => a + (b || 0), 0);
+                },
+                nextRound() {
+                    this.players.forEach((p) => {
+                        if (p.history.length < this.currentRound) p.history.push(0);
+                        p.lastActions = [];
+                    });
+                    this.currentRound++;
+                },
+                exportData() {
+                    let csv = "Team Name,Total Score\n";
+                    this.players.forEach(p => csv += `${p.name},${p.totalScore}\n`);
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.setAttribute('href', url);
+                    a.setAttribute('download', 'battle_score.csv');
+                    a.click();
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>
